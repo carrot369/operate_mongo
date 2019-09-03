@@ -1,0 +1,22 @@
+hostport: 192.168.1.98:40000
+is_insert: 1
+
+mongo_insert:
+  db: test_5
+  collection: offlineMsg_5
+  insertCount: 30
+  field1:
+    key: "cmdId"
+    value: 45173
+  field2:
+    key: createTime
+    value: 1552967597762
+
+mongo_del:
+  db: test_3
+  collection: offlineMsg_3
+  days:
+  timekey:
+  field:
+    key: createTime
+    value: 1552967597769
