@@ -43,16 +43,24 @@ func InsertSpecifiedDocs() {
 	insertCount := 0
 
 	for i := 1; i <= config.GetConfig().MongoInsert.InsertCount; i++ {
+		var isPull bool
+		if config.GetConfig().MongoInsert.Field3.Value == 1 {
+			isPull = true
+		} else if config.GetConfig().MongoInsert.Field3.Value == 2 {
+			isPull = false
+		}
+
 		_, err = coll.InsertOne(
 			context.Background(),
 			bson.D{
-				{"msgId", "d5e60b7edd0c4fc9a17cb83022d718a2"},
+				{config.GetConfig().MongoInsert.Field4.Key, config.GetConfig().MongoInsert.Field4.Value},
 				{"fromId", "3584299134fa4975a9fd4a509898cfb4"},
 				{"toId", "11042"},
 				{"msgData", "Tokyo_London_NewYork"},
 				{config.GetConfig().MongoInsert.Field1.Key, config.GetConfig().MongoInsert.Field1.Value},
 				{config.GetConfig().MongoInsert.Field2.Key, config.GetConfig().MongoInsert.Field2.Value + i},
 				{"isChatDeliver", 1},
+				{config.GetConfig().MongoInsert.Field3.Key, isPull},
 			})
 		if err != nil {
 			seelog.Error("InsertOne_Err:", err)
@@ -74,7 +82,7 @@ func InsertExamples(t *testing.T, db *mongo.Database) {
 	//{
 	n := 1552967597762
 
-	for i := 1; i <= 10; i++ {
+	for i := 1; i <= 5; i++ {
 		result, err := coll.InsertOne(
 			context.Background(),
 			bson.D{
@@ -84,6 +92,7 @@ func InsertExamples(t *testing.T, db *mongo.Database) {
 				{"msgData", ""},
 				{"createTime", n + i},
 				{"isChatDeliver", 1},
+				{"bPulled", true},
 			})
 
 		require.NoError(t, err)
@@ -309,7 +318,7 @@ func DeleteExamples(t *testing.T, db *mongo.Database) {
 }
 
 func DeleteRangeExamples(t *testing.T, db *mongo.Database) {
-	coll := db.Collection("inventory_insert")
+	coll := db.Collection("msg_svr")
 
 	//err := coll.Drop(context.Background())
 	//require.NoError(t, err)
@@ -323,9 +332,9 @@ func DeleteRangeExamples(t *testing.T, db *mongo.Database) {
 	result, _ := coll.DeleteMany(
 		context.Background(),
 		bson.D{
-			{"item", "NewYork"},
+			//{"item", "NewYork"},
 			//{"radioId","2717"},
-			{"qty", bson.D{{"$gt", 25}}},
+			{"bPulled", bson.D{{"$exists", true}}},
 		},
 	)
 	//cursor, _ := coll.Find(
@@ -372,10 +381,18 @@ func DeleteSpecifiedDocs() error {
 
 	coll := db.Collection(config.GetConfig().MongoDel.Collection)
 
+	isKey1 := config.GetConfig().MongoDel.Field1.Key == ""
+	isValue1 := config.GetConfig().MongoDel.Field1.Value == 0
+
+	isKey2 := config.GetConfig().MongoDel.Field2.Key == ""
+	isValue2 := config.GetConfig().MongoDel.Field2.Value == 0
+
+	isKey3 := config.GetConfig().MongoDel.Field3.Key == ""
+	isValue3 := config.GetConfig().MongoDel.Field3.Value == ""
+
 	//first, by days delete data
-	isKey := config.GetConfig().MongoDel.Field.Key == ""
-	isValue := config.GetConfig().MongoDel.Field.Value == 0
-	if config.GetConfig().MongoDel.Days != 0 && isKey && isValue {
+	if config.GetConfig().MongoDel.Days != 0 && isKey1 && isValue1 &&
+		isKey2 && isValue2 && isKey3 && isValue3 {
 		ts, err := dayToTimeStamp()
 		if err != nil {
 			seelog.Error("deleteDataByDay_Panic:", err)
@@ -386,19 +403,124 @@ func DeleteSpecifiedDocs() error {
 	}
 
 	//second, by some fields delete data
-	if config.GetConfig().MongoDel.Days == 0 && !isKey && !isValue {
-		deleteDataBySomeFields(coll)
+	//by three fields
+	if config.GetConfig().MongoDel.Days == 0 && ((!isKey1 && !isValue1) &&
+		(!isKey2 && !isValue2) && (!isKey3 && !isValue3)) {
+		deleteDataByThreeFields(coll)
+
+		return nil
+	}
+
+	//by two fields
+	if config.GetConfig().MongoDel.Days == 0 && ((!isKey1 && !isValue1) &&
+		(!isKey2 && !isValue2)) {
+		deleteDataByTwoFields1(coll)
+
+		return nil
+	}
+	if config.GetConfig().MongoDel.Days == 0 && ((!isKey2 && !isValue2) &&
+		(!isKey3 && !isValue3)) {
+		deleteDataByTwoFields2(coll)
+
+		return nil
+	}
+	if config.GetConfig().MongoDel.Days == 0 && ((!isKey1 && !isValue1) &&
+		(!isKey3 && !isValue3)) {
+		deleteDataByTwoFields3(coll)
+
+		return nil
+	}
+
+	//by one field
+	if config.GetConfig().MongoDel.Days == 0 && (!isKey1 && !isValue1) {
+		deleteDataByOneFields1(coll)
+	}
+	if config.GetConfig().MongoDel.Days == 0 && (!isKey2 && !isValue2) {
+		deleteDataByOneFields2(coll)
+	}
+	if config.GetConfig().MongoDel.Days == 0 && (!isKey3 && !isValue3) {
+		deleteDataByOneFields3(coll)
 	}
 
 	//third, by fields and days
-	if config.GetConfig().MongoDel.Days != 0 && !isKey && !isValue {
+	//by three fields and days
+	if config.GetConfig().MongoDel.Days != 0 && ((!isKey1 && !isValue1) &&
+		(!isKey2 && !isValue2) && (!isKey3 && !isValue3)) {
 		ts, err := dayToTimeStamp()
 		if err != nil {
 			seelog.Error("deleteDataByFieldsAndDays_Panic:", err)
 			panic(err)
 		}
 
-		deleteDataByFieldsAndDays(coll, ts)
+		deleteDataByThreeFieldsAndDays(coll, ts)
+		return nil
+	}
+
+	//by two fields and days
+	if config.GetConfig().MongoDel.Days != 0 && ((!isKey1 && !isValue1) &&
+		(!isKey2 && !isValue2)) {
+		ts, err := dayToTimeStamp()
+		if err != nil {
+			seelog.Error("deleteDataByFieldsAndDays_Panic:", err)
+			panic(err)
+		}
+
+		deleteDataByTwoFieldsAndDays1(coll, ts)
+
+		return nil
+	}
+	if config.GetConfig().MongoDel.Days != 0 && ((!isKey2 && !isValue2) &&
+		(!isKey3 && !isValue3)) {
+		ts, err := dayToTimeStamp()
+		if err != nil {
+			seelog.Error("deleteDataByFieldsAndDays_Panic:", err)
+			panic(err)
+		}
+
+		deleteDataByTwoFieldsAndDays2(coll, ts)
+
+		return nil
+	}
+	if config.GetConfig().MongoDel.Days != 0 && ((!isKey1 && !isValue1) &&
+		(!isKey3 && !isValue3)) {
+		ts, err := dayToTimeStamp()
+		if err != nil {
+			seelog.Error("deleteDataByFieldsAndDays_Panic:", err)
+			panic(err)
+		}
+
+		deleteDataByTwoFieldsAndDays3(coll, ts)
+
+		return nil
+	}
+
+	//by one field and days
+	if config.GetConfig().MongoDel.Days != 0 && (!isKey1 && !isValue1){
+		ts, err := dayToTimeStamp()
+		if err != nil {
+			seelog.Error("deleteDataByFieldsAndDays_Panic:", err)
+			panic(err)
+		}
+
+		deleteDataByOneFieldsAndDays1(coll, ts)
+	}
+	if config.GetConfig().MongoDel.Days != 0 && (!isKey2 && !isValue2){
+		ts, err := dayToTimeStamp()
+		if err != nil {
+			seelog.Error("deleteDataByFieldsAndDays_Panic:", err)
+			panic(err)
+		}
+
+		deleteDataByOneFieldsAndDays2(coll, ts)
+	}
+	if config.GetConfig().MongoDel.Days != 0 && (!isKey3 && !isValue3){
+		ts, err := dayToTimeStamp()
+		if err != nil {
+			seelog.Error("deleteDataByFieldsAndDays_Panic:", err)
+			panic(err)
+		}
+
+		deleteDataByOneFieldsAndDays3(coll, ts)
 	}
 
 	return nil
@@ -417,6 +539,8 @@ func dayToTimeStamp() (int64, error) {
 }
 
 func deleteDataByDay(coll *mongo.Collection, ts int64) error {
+	seelog.Info("deleteDataByDay_TS:", ts)
+
 	result, err := coll.DeleteMany(
 		context.Background(),
 		bson.D{
@@ -432,39 +556,341 @@ func deleteDataByDay(coll *mongo.Collection, ts int64) error {
 	return nil
 }
 
-func deleteDataBySomeFields(coll *mongo.Collection) error {
+func deleteDataByOneFields1(coll *mongo.Collection) error {
 	result, err := coll.DeleteMany(
 		context.Background(),
 		bson.D{
-			{config.GetConfig().MongoDel.Field.Key, config.GetConfig().MongoDel.Field.Value},
+			{config.GetConfig().MongoDel.Field1.Key, config.GetConfig().MongoDel.Field1.Value},
 		},
 	)
 	if err != nil {
-		seelog.Error("deleteDataBySomeFields ERR:", err)
+		seelog.Error("deleteDataByOneFields1 ERR:", err)
 
 		return err
 	}
 
-	seelog.Info("DeletedCountBySomeFields:", result.DeletedCount)
+	seelog.Info("deleteDataByOneFields1:", result.DeletedCount)
 
 	return nil
 }
 
-func deleteDataByFieldsAndDays(coll *mongo.Collection, ts int64) error {
+func deleteDataByOneFields2(coll *mongo.Collection) error {
+	var isPull bool
+	if config.GetConfig().MongoDel.Field2.Value == 1 {
+		isPull = true
+	} else if config.GetConfig().MongoDel.Field2.Value == 2 {
+		isPull = false
+	}
+
 	result, err := coll.DeleteMany(
 		context.Background(),
 		bson.D{
-			{config.GetConfig().MongoDel.Field.Key, config.GetConfig().MongoDel.Field.Value},
-			{config.GetConfig().MongoDel.TimeKey, bson.D{{"$lte", ts}}},
+			{config.GetConfig().MongoDel.Field2.Key, isPull},
 		},
 	)
 	if err != nil {
-		seelog.Error("deleteDataByFieldsAndDays ERR:", err)
+		seelog.Error("deleteDataByOneFields2 ERR:", err)
 
 		return err
 	}
 
-	seelog.Info("DeletedCountByFieldsAndDays:", result.DeletedCount)
+	seelog.Info("deleteDataByOneFields2:", result.DeletedCount)
+
+	return nil
+}
+
+func deleteDataByOneFields3(coll *mongo.Collection) error {
+	result, err := coll.DeleteMany(
+		context.Background(),
+		bson.D{
+			{config.GetConfig().MongoDel.Field3.Key, config.GetConfig().MongoDel.Field3.Value},
+		},
+	)
+	if err != nil {
+		seelog.Error("deleteDataByOneFields3 ERR:", err)
+
+		return err
+	}
+
+	seelog.Info("deleteDataByOneFields3:", result.DeletedCount)
+
+	return nil
+}
+
+func deleteDataByTwoFields1(coll *mongo.Collection) error {
+	var isPull bool
+	if config.GetConfig().MongoDel.Field2.Value == 1 {
+		isPull = true
+	} else if config.GetConfig().MongoDel.Field2.Value == 2 {
+		isPull = false
+	}
+
+	result, err := coll.DeleteMany(
+		context.Background(),
+		bson.D{
+			{config.GetConfig().MongoDel.Field1.Key, config.GetConfig().MongoDel.Field1.Value},
+			{config.GetConfig().MongoDel.Field2.Key, isPull},
+		},
+	)
+	if err != nil {
+		seelog.Error("deleteDataByTwoFields1 ERR:", err)
+
+		return err
+	}
+
+	seelog.Info("deleteDataByTwoFields1:", result.DeletedCount)
+
+	return nil
+}
+
+func deleteDataByTwoFields2(coll *mongo.Collection) error {
+	var isPull bool
+	if config.GetConfig().MongoDel.Field2.Value == 1 {
+		isPull = true
+	} else if config.GetConfig().MongoDel.Field2.Value == 2 {
+		isPull = false
+	}
+
+	result, err := coll.DeleteMany(
+		context.Background(),
+		bson.D{
+			{config.GetConfig().MongoDel.Field2.Key, isPull},
+			{config.GetConfig().MongoDel.Field3.Key, config.GetConfig().MongoDel.Field3.Value},
+		},
+	)
+	if err != nil {
+		seelog.Error("deleteDataByTwoFields2 ERR:", err)
+
+		return err
+	}
+
+	seelog.Info("deleteDataByTwoFields2:", result.DeletedCount)
+
+	return nil
+}
+
+func deleteDataByTwoFields3(coll *mongo.Collection) error {
+	result, err := coll.DeleteMany(
+		context.Background(),
+		bson.D{
+			{config.GetConfig().MongoDel.Field1.Key, config.GetConfig().MongoDel.Field1.Value},
+			{config.GetConfig().MongoDel.Field3.Key, config.GetConfig().MongoDel.Field3.Value},
+		},
+	)
+	if err != nil {
+		seelog.Error("deleteDataByTwoFields3 ERR:", err)
+
+		return err
+	}
+
+	seelog.Info("deleteDataByTwoFields3:", result.DeletedCount)
+
+	return nil
+}
+
+func deleteDataByThreeFields(coll *mongo.Collection) error {
+	var isPull bool
+	if config.GetConfig().MongoDel.Field2.Value == 1 {
+		isPull = true
+	} else if config.GetConfig().MongoDel.Field2.Value == 2 {
+		isPull = false
+	}
+
+	result, err := coll.DeleteMany(
+		context.Background(),
+		bson.D{
+			{config.GetConfig().MongoDel.Field1.Key, config.GetConfig().MongoDel.Field1.Value},
+			{config.GetConfig().MongoDel.Field2.Key, isPull},
+			{config.GetConfig().MongoDel.Field3.Key, config.GetConfig().MongoDel.Field3.Value},
+		},
+	)
+	if err != nil {
+		seelog.Error("deleteDataByThreeFields ERR:", err)
+
+		return err
+	}
+
+	seelog.Info("deleteDataByThreeFields:", result.DeletedCount)
+
+	return nil
+}
+
+func deleteDataByThreeFieldsAndDays(coll *mongo.Collection, ts int64) error {
+	seelog.Info("deleteDataByThreeFieldsAndDays_TS:", ts)
+
+	var isPull bool
+	if config.GetConfig().MongoDel.Field2.Value == 1 {
+		isPull = true
+	} else if config.GetConfig().MongoDel.Field2.Value == 2 {
+		isPull = false
+	}
+
+	result, err := coll.DeleteMany(
+		context.Background(),
+		bson.D{
+			{config.GetConfig().MongoDel.Field1.Key, config.GetConfig().MongoDel.Field1.Value},
+			{config.GetConfig().MongoDel.Field2.Key, isPull},
+			{config.GetConfig().MongoDel.Field3.Key, config.GetConfig().MongoDel.Field3.Value},
+			{config.GetConfig().MongoDel.TimeKey, bson.D{{"$lte", ts}}},
+		},
+	)
+	if err != nil {
+		seelog.Error("deleteDataByThreeFieldsAndDays ERR:", err)
+
+		return err
+	}
+
+	seelog.Info("deleteDataByThreeFieldsAndDays:", result.DeletedCount)
+
+	return nil
+}
+
+func deleteDataByTwoFieldsAndDays1(coll *mongo.Collection, ts int64) error {
+	seelog.Info("deleteDataByTwoFieldsAndDays1_TS:", ts)
+
+	var isPull bool
+	if config.GetConfig().MongoDel.Field2.Value == 1 {
+		isPull = true
+	} else if config.GetConfig().MongoDel.Field2.Value == 2 {
+		isPull = false
+	}
+
+	result, err := coll.DeleteMany(
+		context.Background(),
+		bson.D{
+			{config.GetConfig().MongoDel.Field1.Key, config.GetConfig().MongoDel.Field1.Value},
+			{config.GetConfig().MongoDel.Field2.Key, isPull},
+			{config.GetConfig().MongoDel.TimeKey, bson.D{{"$lte", ts}}},
+		},
+	)
+	if err != nil {
+		seelog.Error("deleteDataByTwoFieldsAndDays1 ERR:", err)
+
+		return err
+	}
+
+	seelog.Info("deleteDataByTwoFieldsAndDays1:", result.DeletedCount)
+
+	return nil
+}
+
+func deleteDataByTwoFieldsAndDays2(coll *mongo.Collection, ts int64) error {
+	seelog.Info("deleteDataByTwoFieldsAndDays2_TS:", ts)
+
+	var isPull bool
+	if config.GetConfig().MongoDel.Field2.Value == 1 {
+		isPull = true
+	} else if config.GetConfig().MongoDel.Field2.Value == 2 {
+		isPull = false
+	}
+
+	result, err := coll.DeleteMany(
+		context.Background(),
+		bson.D{
+			{config.GetConfig().MongoDel.Field2.Key, isPull},
+			{config.GetConfig().MongoDel.Field3.Key, config.GetConfig().MongoDel.Field3.Value},
+			{config.GetConfig().MongoDel.TimeKey, bson.D{{"$lte", ts}}},
+		},
+	)
+	if err != nil {
+		seelog.Error("deleteDataByTwoFieldsAndDays2 ERR:", err)
+
+		return err
+	}
+
+	seelog.Info("deleteDataByTwoFieldsAndDays2:", result.DeletedCount)
+
+	return nil
+}
+
+func deleteDataByTwoFieldsAndDays3(coll *mongo.Collection, ts int64) error {
+	seelog.Info("deleteDataByTwoFieldsAndDays3_TS:", ts)
+
+	result, err := coll.DeleteMany(
+		context.Background(),
+		bson.D{
+			{config.GetConfig().MongoDel.Field1.Key, config.GetConfig().MongoDel.Field1.Value},
+			{config.GetConfig().MongoDel.Field3.Key, config.GetConfig().MongoDel.Field3.Value},
+			{config.GetConfig().MongoDel.TimeKey, bson.D{{"$lte", ts}}},
+		},
+	)
+	if err != nil {
+		seelog.Error("deleteDataByTwoFieldsAndDays3 ERR:", err)
+
+		return err
+	}
+
+	seelog.Info("deleteDataByTwoFieldsAndDays3:", result.DeletedCount)
+
+	return nil
+}
+
+func deleteDataByOneFieldsAndDays1(coll *mongo.Collection, ts int64) error {
+	seelog.Info("deleteDataByOneFieldsAndDays1_TS:", ts)
+
+	result, err := coll.DeleteMany(
+		context.Background(),
+		bson.D{
+			{config.GetConfig().MongoDel.Field1.Key, config.GetConfig().MongoDel.Field1.Value},
+			{config.GetConfig().MongoDel.TimeKey, bson.D{{"$lte", ts}}},
+		},
+	)
+	if err != nil {
+		seelog.Error("deleteDataByOneFieldsAndDays1 ERR:", err)
+
+		return err
+	}
+
+	seelog.Info("deleteDataByOneFieldsAndDays1:", result.DeletedCount)
+
+	return nil
+}
+
+func deleteDataByOneFieldsAndDays2(coll *mongo.Collection, ts int64) error {
+	seelog.Info("deleteDataByOneFieldsAndDays2_TS:", ts)
+
+	var isPull bool
+	if config.GetConfig().MongoDel.Field2.Value == 1 {
+		isPull = true
+	} else if config.GetConfig().MongoDel.Field2.Value == 2 {
+		isPull = false
+	}
+
+	result, err := coll.DeleteMany(
+		context.Background(),
+		bson.D{
+			{config.GetConfig().MongoDel.Field2.Key, isPull},
+			{config.GetConfig().MongoDel.TimeKey, bson.D{{"$lte", ts}}},
+		},
+	)
+	if err != nil {
+		seelog.Error("deleteDataByOneFieldsAndDays2 ERR:", err)
+
+		return err
+	}
+
+	seelog.Info("deleteDataByOneFieldsAndDays2:", result.DeletedCount)
+
+	return nil
+}
+
+func deleteDataByOneFieldsAndDays3(coll *mongo.Collection, ts int64) error {
+	seelog.Info("deleteDataByOneFieldsAndDays3_TS:", ts)
+
+	result, err := coll.DeleteMany(
+		context.Background(),
+		bson.D{
+			{config.GetConfig().MongoDel.Field3.Key, config.GetConfig().MongoDel.Field3.Value},
+			{config.GetConfig().MongoDel.TimeKey, bson.D{{"$lte", ts}}},
+		},
+	)
+	if err != nil {
+		seelog.Error("deleteDataByOneFieldsAndDays3 ERR:", err)
+
+		return err
+	}
+
+	seelog.Info("deleteDataByOneFieldsAndDays3:", result.DeletedCount)
 
 	return nil
 }

@@ -1,22 +1,36 @@
 hostport: 192.168.1.98:40000
-is_insert: 1
+is_insert: 
 
 mongo_insert:
-  db: test_5
-  collection: offlineMsg_5
+  db: test3
+  collection: offlineMsg1
   insertCount: 30
   field1:
-    key: "cmdId"
-    value: 45173
+    key: cmdId
+    value: 20190827
   field2:
     key: createTime
-    value: 1552967597762
+    value: 1566921599000
+  #bPulled为bool型，1为true，2为false
+  field3:
+    key: bPulled
+    value: 1
+  field4:
+    key: msgId
+    value: d5e60b7edd0c4fc9a17cb83022d718a2
 
 mongo_del:
-  db: test_3
-  collection: offlineMsg_3
-  days:
-  timekey:
-  field:
-    key: createTime
-    value: 1552967597769
+  db: test3
+  collection: offlineMsg1
+  days: 6
+  timekey: createTime
+  field1:
+    key:
+    value:
+  #bPulled为bool型，1为true，2为false
+  field2:
+    key:
+    value:
+  field3:
+    key:
+    value:

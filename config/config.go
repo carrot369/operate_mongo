@@ -10,18 +10,20 @@ import (
 var g_config *config
 
 type config struct {
-	HostPort   string      `yaml:"hostport"`
+	HostPort    string      `yaml:"hostport"`
 	MongoInsert mongoInsert `yaml:"mongo_insert"`
-	MongoDel   mongoDel    `yaml:"mongo_del"`
-	IsInsert   int         `yaml:"is_insert"`
+	MongoDel    mongoDel    `yaml:"mongo_del"`
+	IsInsert    int         `yaml:"is_insert"`
 }
 
 type mongoInsert struct {
 	DataBase    string `yaml:"db"`
 	Collection  string `yaml:"collection"`
-	InsertCount int `yaml:"insertCount"`
+	InsertCount int    `yaml:"insertCount"`
 	Field1      field1 `yaml:"field1"`
 	Field2      field2 `yaml:"field2"`
+	Field3      field3 `yaml:"field3"`
+	Field4      field4 `yaml:"field4"`
 }
 
 type field1 struct {
@@ -34,17 +36,29 @@ type field2 struct {
 	Value int    `yaml:"value"`
 }
 
+type field3 struct {
+	Key   string `yaml:"key"`
+	Value int    `yaml:"value"`
+}
+
+type field4 struct {
+	Key   string `yaml:"key"`
+	Value string `yaml:"value"`
+}
+
 type mongoDel struct {
 	DataBase   string `yaml:"db"`
 	Collection string `yaml:"collection"`
 	Days       int    `yaml:"days"`
 	TimeKey    string `yaml:"timekey"`
-	Field      field  `yaml:"field"`
+	Field1     field1 `yaml:"field1"`
+	Field2     field2 `yaml:"field2"`
+	Field3     field  `yaml:"field3"`
 }
 
 type field struct {
 	Key   string `yaml:"key"`
-	Value int    `yaml:"value"`
+	Value string `yaml:"value"`
 }
 
 func LoadConfig(filename string) (conf *config) {
